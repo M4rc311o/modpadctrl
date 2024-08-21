@@ -4,12 +4,12 @@ use hidapi::{HidApi, HidDevice, HidError};
 
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum MacropadApiError {
+pub enum ModpadApiError {
     HidApiError(HidError),
-    MacropadNotFound
+    ModpadNotFound
 }
 
-impl Error for MacropadApiError {
+impl Error for ModpadApiError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match *self {
             Self::HidApiError(ref err) => Some(err),
@@ -18,49 +18,49 @@ impl Error for MacropadApiError {
     }
 }
 
-impl fmt::Display for MacropadApiError {
+impl fmt::Display for ModpadApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Self::HidApiError(_) => write!(f, "Underlying HID API error"),
-            Self::MacropadNotFound => write!(f, "Macropad not found")
+            Self::ModpadNotFound => write!(f, "Modpad not found")
         }
     }
 }
 
-impl From<HidError> for MacropadApiError {
+impl From<HidError> for ModpadApiError {
     fn from(err: HidError) -> Self {
         Self::HidApiError(err)
     }
 }
 
-pub struct MacropadApi {
+pub struct ModpadApi {
     hidapi_ctx: HidApi,
-    macropad_device: HidDevice
+    modpad_device: HidDevice
 }
 
-impl MacropadApi {
-    pub fn new() -> Result<Self, MacropadApiError> {
-        const VID: u16 = 0x00;
-        const PID: u16 = 0x00;
-        const USAGE_PAGE: u16 = 0x00;
+impl ModpadApi {
+    pub fn new() -> Result<Self, ModpadApiError> {
+        const VID: u16 = 0x03eb;
+        const PID: u16 = 0x2066;
+        const USAGE_PAGE: u16 = 0xff;
 
         let hidapi_ctx = HidApi::new()?;
-        let macropad_device_info_opt = hidapi_ctx.device_list().find(|device| {
+        let modpad_device_info_opt = hidapi_ctx.device_list().find(|device| {
             device.vendor_id() == VID &&
             device.product_id() == PID &&
             device.usage_page() == USAGE_PAGE
         });
 
-        let macropad_device_path = match macropad_device_info_opt {
-            Some(macropad_device_info) => macropad_device_info.path(),
-            None => return Err(MacropadApiError::MacropadNotFound)
+        let modpad_device_path = match modpad_device_info_opt {
+            Some(modpad_device_info) => modpad_device_info.path(),
+            None => return Err(ModpadApiError::ModpadNotFound)
         };
 
-        let macropad_device = hidapi_ctx.open_path(macropad_device_path)?;
+        let modpad_device = hidapi_ctx.open_path(modpad_device_path)?;
 
         Ok(Self {
             hidapi_ctx,
-            macropad_device
+            modpad_device
         })
     }
 }

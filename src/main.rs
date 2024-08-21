@@ -1,7 +1,6 @@
 use std::error::Error;
-
-use macropadctrl::MacropadApi;
+use modpadctrl::ModpadApi;
 
 fn main() {
-        let macropad_api = MacropadApi::new().expect("Creating MacropadApi failed");
+        let modpad_api = ModpadApi::new().expect("Creating MacropadApi failed");
 }
