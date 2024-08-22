@@ -1,40 +1,12 @@
-use core::fmt;
-use std::error::Error;
-use hidapi::{HidApi, HidDevice, HidError};
+use command::ModpadReport;
+use error::ModpadApiError;
+use hidapi::{HidApi, HidDevice};
 
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum ModpadApiError {
-    HidApiError(HidError),
-    ModpadNotFound
-}
-
-impl Error for ModpadApiError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match *self {
-            Self::HidApiError(ref err) => Some(err),
-            _ => None
-        }
-    }
-}
-
-impl fmt::Display for ModpadApiError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::HidApiError(_) => write!(f, "Underlying HID API error"),
-            Self::ModpadNotFound => write!(f, "Modpad not found")
-        }
-    }
-}
-
-impl From<HidError> for ModpadApiError {
-    fn from(err: HidError) -> Self {
-        Self::HidApiError(err)
-    }
-}
+pub mod error;
+pub mod command;
 
 pub struct ModpadApi {
-    hidapi_ctx: HidApi,
+    //hidapi_ctx: HidApi,
     modpad_device: HidDevice
 }
 
@@ -59,8 +31,26 @@ impl ModpadApi {
         let modpad_device = hidapi_ctx.open_path(modpad_device_path)?;
 
         Ok(Self {
-            hidapi_ctx,
+            //hidapi_ctx,
             modpad_device
         })
+    }
+
+    pub fn send_command(&self, command: &impl ModpadReport) -> Result<(), ModpadApiError> {
+        let modpad_command_report = command.build_report();
+        let mut buffer = [0; 8];
+
+        buffer[0] = modpad_command_report.report_id;
+        buffer[2] = (modpad_command_report.command_type >> 8) as u8;
+        buffer[1] = (modpad_command_report.command_type & 0xff) as u8;
+        buffer[4] = (modpad_command_report.value >> 8) as u8;
+        buffer[3] = (modpad_command_report.value & 0xff) as u8;
+        buffer[5] = modpad_command_report.profile;
+        buffer[6] = modpad_command_report.row;
+        buffer[7] = modpad_command_report.column;
+
+        self.modpad_device.send_feature_report(&buffer)?;
+
+        Ok(())
     }
 }
