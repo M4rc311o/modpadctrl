@@ -1,6 +1,6 @@
-use command::ModpadReport;
 use error::ModpadApiError;
 use hidapi::{HidApi, HidDevice};
+use command::*;
 
 pub mod error;
 pub mod command;
@@ -36,7 +36,7 @@ impl ModpadApi {
         })
     }
 
-    pub fn send_command(&self, command: &impl ModpadReport) -> Result<(), ModpadApiError> {
+    fn send_command(&self, command: impl ModpadReport) -> Result<(), ModpadApiError> {
         let modpad_command_report = command.build_report();
         let mut buffer = [0; 8];
 
@@ -53,4 +53,37 @@ impl ModpadApi {
 
         Ok(())
     }
+
+    pub fn set_effect(&self, effect: Effect) -> Result<(), ModpadApiError> {
+        self.send_command(effect)?;
+        Ok(())
+    }
+
+    pub fn change_brightness(&self, brightness_dir: Brightness) -> Result<(), ModpadApiError> {
+        self.send_command(brightness_dir)?;
+        Ok(())
+    }
+
+    pub fn switch_profile(&self, profile_number: u8) -> Result<(), ModpadApiError> {
+        self.send_command(Profile::new(profile_number)?)?;
+        Ok(())
+    }
+
+    pub fn remap(&self, key_code: u16, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
+        self.send_command(Mapping::new(key_code, profile_number, row, column)?)?;
+        Ok(())
+    }
+}
+
+trait ModpadReport {
+    fn build_report(&self) -> ModpadCommandReport;
+}
+
+struct ModpadCommandReport {
+    pub report_id: u8,
+    pub command_type: u16,
+    pub value: u16,
+    pub profile: u8,
+    pub row: u8,
+    pub column: u8
 }

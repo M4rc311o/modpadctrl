@@ -1,9 +1,8 @@
-use modpadctrl::{command, ModpadApi};
+use modpadctrl::{command::Brightness, ModpadApi};
 
 fn main() {
         let modpad_api = ModpadApi::new().expect("Creating MacropadApi failed");
 
-        modpad_api.send_command(&command::Brightness::BrightnessIncrease).expect("Unable to send command");
-        let modpad_command = command::Mapping::new(0x15, 1, 1, 2).expect("That's a wrong number");
-        modpad_api.send_command(&modpad_command).expect("Unable to send command");
+        modpad_api.change_brightness(Brightness::BrightnessIncrease).unwrap();
+        modpad_api.remap(0x15, 1, 1, 2).unwrap();
 }

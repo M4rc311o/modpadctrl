@@ -1,12 +1,8 @@
-use crate::error::ModpadApiError;
+use crate::{error::ModpadApiError, ModpadCommandReport, ModpadReport};
 
 const PROFILE_COUNT: u8 = 4;
 const ROW_COUNT: u8 = 2;
 const COLUMN_COUNT: u8 = 4;
-
-pub trait ModpadReport {
-    fn build_report(&self) -> ModpadCommandReport;
-}
 
 pub enum Effect {   
     Off,
@@ -121,13 +117,4 @@ impl ModpadReport for Mapping {
             column: self.column
         }
     }
-}
-
-pub struct ModpadCommandReport {
-    pub report_id: u8,
-    pub command_type: u16,
-    pub value: u16,
-    pub profile: u8,
-    pub row: u8,
-    pub column: u8
 }
