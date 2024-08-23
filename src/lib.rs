@@ -1,6 +1,5 @@
 use error::ModpadApiError;
 use hidapi::{HidApi, HidDevice};
-use keycode::{KeyMap, KeyMappingId};
 
 pub mod error;
 
@@ -9,9 +8,9 @@ pub struct ModpadApi {
 }
 
 impl ModpadApi {
-    const PROFILE_COUNT: u8 = 4;
-    const ROW_COUNT: u8 = 2;
-    const COLUMN_COUNT: u8 = 4;
+    pub const PROFILE_COUNT: u8 = 4;
+    pub const ROW_COUNT: u8 = 2;
+    pub const COLUMN_COUNT: u8 = 4;
 
     pub fn new() -> Result<Self, ModpadApiError> {
         const VID: u16 = 0x03eb;
@@ -101,12 +100,13 @@ impl ModpadApi {
         }
     }
 
-    pub fn remap(&self, key_code: KeyMappingId, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
+    pub fn map(&self, key_code: u16/*KeyMappingId*/, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
         if (1..=Self::PROFILE_COUNT).contains(&profile_number) && (1..=Self::ROW_COUNT).contains(&row) && (1..=Self::COLUMN_COUNT).contains(&column) {
             self.send_command(ModpadCommandReport {
                 report_id: 0x03,
                 command_type: 0x04,
-                value: KeyMap::from(key_code).usb,
+                //value: KeyMap::from(key_code).usb,
+                value: key_code,
                 profile: profile_number,
                 row: row,
                 column: column
