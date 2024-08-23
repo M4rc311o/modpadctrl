@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 hidapi = "2.6.3"
+keycode = "0.4.0"
