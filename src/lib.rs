@@ -1,16 +1,17 @@
 use error::ModpadApiError;
 use hidapi::{HidApi, HidDevice};
-use command::*;
 
 pub mod error;
-pub mod command;
 
 pub struct ModpadApi {
-    //hidapi_ctx: HidApi,
     modpad_device: HidDevice
 }
 
 impl ModpadApi {
+    const PROFILE_COUNT: u8 = 4;
+    const ROW_COUNT: u8 = 2;
+    const COLUMN_COUNT: u8 = 4;
+
     pub fn new() -> Result<Self, ModpadApiError> {
         const VID: u16 = 0x03eb;
         const PID: u16 = 0x2066;
@@ -31,13 +32,11 @@ impl ModpadApi {
         let modpad_device = hidapi_ctx.open_path(modpad_device_path)?;
 
         Ok(Self {
-            //hidapi_ctx,
             modpad_device
         })
     }
 
-    fn send_command(&self, command: impl ModpadReport) -> Result<(), ModpadApiError> {
-        let modpad_command_report = command.build_report();
+    fn send_command(&self, modpad_command_report: ModpadCommandReport) -> Result<(), ModpadApiError> {
         let mut buffer = [0; 8];
 
         buffer[0] = modpad_command_report.report_id;
@@ -55,28 +54,80 @@ impl ModpadApi {
     }
 
     pub fn set_effect(&self, effect: Effect) -> Result<(), ModpadApiError> {
-        self.send_command(effect)?;
-        Ok(())
+        self.send_command(ModpadCommandReport {
+            report_id: 0x03,
+            command_type: 0x01,
+            value: match effect {
+                Effect::Off => 0x101,
+                Effect::MaxBrightness => 0x102,
+                Effect::Breathing => 0x103,
+                Effect::ButtonActivated => 0x104,
+                Effect::CustomBrightness => 0x105,
+                Effect::Random => 0x106
+            },
+            profile: 0,
+            row: 0,
+            column: 0
+        })
     }
 
     pub fn change_brightness(&self, brightness_dir: Brightness) -> Result<(), ModpadApiError> {
-        self.send_command(brightness_dir)?;
-        Ok(())
+        self.send_command(ModpadCommandReport {
+            report_id: 0x03,
+            command_type: 0x02,
+            value: match brightness_dir {
+                Brightness::BrightnessIncrease => 0x20a,
+                Brightness::BrightnessDecrease => 0x20b
+            },
+            profile: 0,
+            row: 0,
+            column: 0
+        })
     }
 
     pub fn switch_profile(&self, profile_number: u8) -> Result<(), ModpadApiError> {
-        self.send_command(Profile::new(profile_number)?)?;
-        Ok(())
+        if (1..=Self::PROFILE_COUNT).contains(&profile_number) {
+            self.send_command(ModpadCommandReport {
+                report_id: 0x03,
+                command_type: 0x03,
+                value: profile_number as u16,
+                profile: 0,
+                row: 0,
+                column: 0
+            })
+        } else {
+            Err(ModpadApiError::CommandArgumentInvalid)
+        }
     }
 
     pub fn remap(&self, key_code: u16, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
-        self.send_command(Mapping::new(key_code, profile_number, row, column)?)?;
-        Ok(())
+        if (1..=Self::PROFILE_COUNT).contains(&profile_number) && (1..=Self::ROW_COUNT).contains(&row) && (1..=Self::COLUMN_COUNT).contains(&column) {
+            self.send_command(ModpadCommandReport {
+                report_id: 0x03,
+                command_type: 0x04,
+                value: key_code,
+                profile: profile_number,
+                row: row,
+                column: column
+            })
+        } else {
+            Err(ModpadApiError::CommandArgumentInvalid)
+        }
     }
 }
 
-trait ModpadReport {
-    fn build_report(&self) -> ModpadCommandReport;
+pub enum Effect {   
+    Off,
+    MaxBrightness,
+    Breathing,
+    ButtonActivated,
+    CustomBrightness,
+    Random
+}
+
+pub enum Brightness {
+    BrightnessIncrease,
+    BrightnessDecrease
 }
 
 struct ModpadCommandReport {

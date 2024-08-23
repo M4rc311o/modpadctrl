@@ -1,4 +1,4 @@
-use modpadctrl::{command::Brightness, ModpadApi};
+use modpadctrl::{Brightness, ModpadApi};
 
 fn main() {
         let modpad_api = ModpadApi::new().expect("Creating MacropadApi failed");
