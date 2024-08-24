@@ -1,83 +1,99 @@
-use modpadctrl::{Brightness, Effect, ModpadApi};
-use clap::{Parser, Subcommand, ValueEnum};
+use std::process;
+
+use modpadctrl::{keyboard_keypad_page::KeyboardKeypadPage, Brightness, Effect, ModpadApi};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands
+    command: Commands,
+    /// More verbose output
+    #[arg(short, long)]
+    verbose: bool,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Change effect
     Effect {
         #[arg(value_enum)]
-        effect: EffectType
+        effect: Effect
     },
+    /// Increase/Decrease brightness
     Brightness {
         #[arg(value_enum)]
-        direction: BrightnessDir
+        direction: Brightness
     },
+    /// Switch profile
     Profile {
         #[arg(value_parser = profile_in_range)]
         profile: u8
     },
+    /// Remap key
     Map {
-        key_code: u16,
-        #[arg(value_parser = profile_in_range)]
+        /// Key code that will be mapped to specified key
+        #[arg(value_enum)]
+        key_code: KeyboardKeypadPage,
+        /// Profile where to remap key
+        #[arg(short, long, value_parser = profile_in_range)]
         profile: u8,
-        #[arg(value_parser = row_in_range)]
+        /// Key row
+        #[arg(short, long, value_parser = row_in_range)]
         row: u8,
-        #[arg(value_parser = column_in_range)]
+        /// Key column
+        #[arg(short, long, value_parser = column_in_range)]
         column: u8
     }
-}
-
-#[derive(Clone, ValueEnum, Debug)]
-enum EffectType {
-    Off,
-    MaxBrightness,
-    Breathing,
-    ButtonActivated,
-    CustomBrightness,
-    Random
-}
-
-#[derive(Clone, ValueEnum, Debug)]
-enum BrightnessDir {
-    Inc,
-    Dec
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    let modpad_api = ModpadApi::new().expect("Creating MacropadApi failed");
+    let modpad_api = ModpadApi::new().unwrap_or_else(|err| {
+        eprintln!(
+            "Creating ModpadApi failed: {}",
+            if cli.verbose { format!("{err:?}") } else { format!("{err}") }
+        );
+        process::exit(1);
+    });
 
     match cli.command {
         Commands::Effect { effect } => {
-            let effect_type = match effect {
-                EffectType::Off => Effect::Off,
-                EffectType::MaxBrightness => Effect::MaxBrightness,
-                EffectType::Breathing => Effect::Breathing,
-                EffectType::ButtonActivated => Effect::ButtonActivated,
-                EffectType::CustomBrightness => Effect::CustomBrightness,
-                EffectType::Random => Effect::Random
-            };
-            modpad_api.set_effect(effect_type).expect("Can't set effect");
+            modpad_api.set_effect(effect).unwrap_or_else(|err| {
+                eprintln!(
+                    "Changing effect failed: {}",
+                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
+                );
+                process::exit(1);
+            });
         },
         Commands::Brightness { direction } => {
-            let brightness_dir = match direction {
-                BrightnessDir::Inc => Brightness::BrightnessIncrease,
-                BrightnessDir::Dec => Brightness::BrightnessDecrease
-            };
-            modpad_api.change_brightness(brightness_dir).expect("Can't set brightness");
+            modpad_api.change_brightness(direction).unwrap_or_else(|err| {
+                eprintln!(
+                    "Changing brightness failed: {}",
+                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
+                );
+                process::exit(1);
+            });
         },
         Commands::Profile { profile } => {
-            modpad_api.switch_profile(profile).expect("Can't change profile");
+            modpad_api.switch_profile(profile).unwrap_or_else(|err| {
+                eprintln!(
+                    "Swithing profile failed: {}",
+                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
+                );
+                process::exit(1);
+            });
         },
         Commands::Map { key_code, profile, row, column } => {
-            modpad_api.map(key_code, profile, row, column).expect("Mapping failed");
+            modpad_api.map(key_code, profile, row, column).unwrap_or_else(|err| {
+                eprintln!(
+                    "Mapping key failed: {}",
+                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
+                );
+                process::exit(1);
+            });
         }
     }
 }

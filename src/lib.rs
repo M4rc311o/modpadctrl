@@ -1,7 +1,10 @@
+use clap::ValueEnum;
 use error::ModpadApiError;
 use hidapi::{HidApi, HidDevice};
+use keyboard_keypad_page::KeyboardKeypadPage;
 
 pub mod error;
+pub mod keyboard_keypad_page;
 
 pub struct ModpadApi {
     modpad_device: HidDevice
@@ -76,8 +79,8 @@ impl ModpadApi {
             report_id: 0x03,
             command_type: 0x02,
             value: match brightness_dir {
-                Brightness::BrightnessIncrease => 0x20a,
-                Brightness::BrightnessDecrease => 0x20b
+                Brightness::Increase => 0x20a,
+                Brightness::Decrease => 0x20b
             },
             profile: 0,
             row: 0,
@@ -100,13 +103,12 @@ impl ModpadApi {
         }
     }
 
-    pub fn map(&self, key_code: u16/*KeyMappingId*/, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
+    pub fn map(&self, key_code: KeyboardKeypadPage, profile_number: u8, row: u8, column: u8) -> Result<(), ModpadApiError> {
         if (1..=Self::PROFILE_COUNT).contains(&profile_number) && (1..=Self::ROW_COUNT).contains(&row) && (1..=Self::COLUMN_COUNT).contains(&column) {
             self.send_command(ModpadCommandReport {
                 report_id: 0x03,
                 command_type: 0x04,
-                //value: KeyMap::from(key_code).usb,
-                value: key_code,
+                value: key_code as u16,
                 profile: profile_number,
                 row: row,
                 column: column
@@ -117,6 +119,7 @@ impl ModpadApi {
     }
 }
 
+#[derive(Clone, ValueEnum, Debug)]
 pub enum Effect {   
     Off,
     MaxBrightness,
@@ -126,9 +129,10 @@ pub enum Effect {
     Random
 }
 
+#[derive(Clone, ValueEnum, Debug)]
 pub enum Brightness {
-    BrightnessIncrease,
-    BrightnessDecrease
+    Increase,
+    Decrease
 }
 
 struct ModpadCommandReport {
