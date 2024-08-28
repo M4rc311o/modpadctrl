@@ -93,7 +93,7 @@ impl ModpadApi {
             self.send_command(ModpadCommandReport {
                 report_id: 0x03,
                 command_type: 0x03,
-                value: profile_number as u16,
+                value: (profile_number - 1) as u16,
                 profile: 0,
                 row: 0,
                 column: 0
@@ -109,9 +109,9 @@ impl ModpadApi {
                 report_id: 0x03,
                 command_type: 0x04,
                 value: key_code as u16,
-                profile: profile_number,
-                row: row,
-                column: column
+                profile: profile_number - 1,
+                row: row - 1,
+                column: column - 1
             })
         } else {
             Err(ModpadApiError::CommandArgumentInvalid)
