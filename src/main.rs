@@ -39,12 +39,9 @@ enum Commands {
         /// Profile where to remap key
         #[arg(short, long, value_parser = profile_in_range)]
         profile: u8,
-        /// Key row
-        #[arg(short, long, value_parser = row_in_range)]
-        row: u8,
-        /// Key column
-        #[arg(short, long, value_parser = column_in_range)]
-        column: u8
+        /// Key number
+        #[arg(short, long, value_parser = key_in_range)]
+        key_number: u8
     }
 }
 
@@ -83,8 +80,8 @@ fn main() {
             });
             log::info!("Switch profile command executed");
         },
-        Commands::Map { key_code, profile, row, column } => {
-            modpad_api.map(key_code, profile, row, column).unwrap_or_else(|err| {
+        Commands::Map { key_code, profile, key_number} => {
+            modpad_api.map(key_code, profile, key_number).unwrap_or_else(|err| {
                 log::error!("Mapping key failed: {err:?}");
                 process::exit(1);
             });
@@ -109,34 +106,18 @@ fn profile_in_range(s: &str) -> Result<u8, String> {
     }
 }
 
-fn row_in_range(s: &str) -> Result<u8, String> {
-    let row_range = 1..=ModpadApi::ROW_COUNT;
+fn key_in_range(s: &str) -> Result<u8, String> {
+    let key_range = 1..=ModpadApi::KEY_COUNT;
 
-    let row = s.parse::<u8>().map_err(|_| format!("`{s}` isn't a row number"))?;
+    let key = s.parse::<u8>().map_err(|_| format!("`{s}` isn't a key number"))?;
 
-    if row_range.contains(&row) {
-        Ok(row)
+    if key_range.contains(&key) {
+        Ok(key)
     } else {
         Err(format!(
             "row not in range {}-{}",
-            row_range.start(),
-            row_range.end()
-        ))
-    }
-}
-
-fn column_in_range(s: &str) -> Result<u8, String> {
-    let column_range = 1..=ModpadApi::COLUMN_COUNT;
-
-    let column = s.parse::<u8>().map_err(|_| format!("`{s}` isn't a column number"))?;
-
-    if column_range.contains(&column) {
-        Ok(column)
-    } else {
-        Err(format!(
-            "column not in range {}-{}",
-            column_range.start(),
-            column_range.end()
+            key_range.start(),
+            key_range.end()
         ))
     }
 }
