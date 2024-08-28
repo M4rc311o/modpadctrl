@@ -52,6 +52,7 @@ impl ModpadApi {
         buffer[7] = modpad_command_report.column;
 
         self.modpad_device.send_feature_report(&buffer)?;
+        log::debug!("Sent feature report: {buffer:?}");
 
         Ok(())
     }

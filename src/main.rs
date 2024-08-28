@@ -2,6 +2,7 @@ use std::process;
 
 use modpadctrl::{keyboard_keypad_page::KeyboardKeypadPage, Brightness, Effect, ModpadApi};
 use clap::{Parser, Subcommand};
+use clap_verbosity_flag::Verbosity;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -9,8 +10,8 @@ struct Cli {
     #[command(subcommand)]
     command: Commands,
     /// More verbose output
-    #[arg(short, long)]
-    verbose: bool,
+    #[command(flatten)]
+    verbose: Verbosity
 }
 
 #[derive(Subcommand, Debug)]
@@ -50,50 +51,44 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
+    env_logger::Builder::new()
+        .filter_level(cli.verbose.log_level_filter())
+        .init();
+
     let modpad_api = ModpadApi::new().unwrap_or_else(|err| {
-        eprintln!(
-            "Creating ModpadApi failed: {}",
-            if cli.verbose { format!("{err:?}") } else { format!("{err}") }
-        );
+        log::error!("Creating ModpadApi failed: {err:?}");
         process::exit(1);
     });
+    log::info!("ModpadApi created");
 
     match cli.command {
         Commands::Effect { effect } => {
             modpad_api.set_effect(effect).unwrap_or_else(|err| {
-                eprintln!(
-                    "Changing effect failed: {}",
-                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
-                );
+                log::error!("Changing effect failed: {err:?}");
                 process::exit(1);
             });
+            log::info!("Change effect command executed");
         },
         Commands::Brightness { direction } => {
             modpad_api.change_brightness(direction).unwrap_or_else(|err| {
-                eprintln!(
-                    "Changing brightness failed: {}",
-                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
-                );
+                log::error!("Changing brightness failed: {err:?}");
                 process::exit(1);
             });
+            log::info!("Change brightness command executed");
         },
         Commands::Profile { profile } => {
             modpad_api.switch_profile(profile).unwrap_or_else(|err| {
-                eprintln!(
-                    "Swithing profile failed: {}",
-                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
-                );
+                log::error!("Swithing profile failed: {err:?}");
                 process::exit(1);
             });
+            log::info!("Switch profile command executed");
         },
         Commands::Map { key_code, profile, row, column } => {
             modpad_api.map(key_code, profile, row, column).unwrap_or_else(|err| {
-                eprintln!(
-                    "Mapping key failed: {}",
-                    if cli.verbose { format!("{err:?}") } else { format!("{err}") }
-                );
+                log::error!("Mapping key failed: {err:?}");
                 process::exit(1);
             });
+            log::info!("Map command executed");
         }
     }
 }
