@@ -42,7 +42,7 @@ enum Commands {
         /// Key number
         #[arg(short, long, value_parser = key_in_range)]
         key_number: u8
-    }
+    },
 }
 
 fn main() {
@@ -86,7 +86,7 @@ fn main() {
                 process::exit(1);
             });
             log::info!("Map command executed");
-        }
+        },
     }
 }
 

@@ -1,3 +1,4 @@
+
 use clap::ValueEnum;
 use error::ModpadApiError;
 use hidapi::{HidApi, HidDevice};
@@ -7,7 +8,8 @@ pub mod error;
 pub mod keyboard_keypad_page;
 
 pub struct ModpadApi {
-    modpad_device: HidDevice
+    modpad_slider: HidDevice,
+    modpad_feature: HidDevice
 }
 
 impl ModpadApi {
@@ -15,28 +17,39 @@ impl ModpadApi {
     pub const ROW_COUNT: u8 = 2;
     pub const COLUMN_COUNT: u8 = 4;
     pub const KEY_COUNT: u8 = Self::ROW_COUNT * Self::COLUMN_COUNT;
+    pub const FEATURE_REPORT: &'static str = "feature";
+    pub const SLIDER_REPORT: &'static str = "slider";
 
     pub fn new() -> Result<Self, ModpadApiError> {
         const VID: u16 = 0x03eb;
         const PID: u16 = 0x2066;
         const USAGE_PAGE: u16 = 0xff;
+        const INTERFACE_NUMBER: i32 = 1;
 
-        let hidapi_ctx = HidApi::new()?;
-        let modpad_device_info_opt = hidapi_ctx.device_list().find(|device| {
-            device.vendor_id() == VID &&
-            device.product_id() == PID &&
+        let mut hidapi_ctx = HidApi::new_without_enumerate()?;
+        hidapi_ctx.add_devices(VID, PID)?;
+
+        let modpad_feature_info_opt = hidapi_ctx.device_list().find(|device| {
             device.usage_page() == USAGE_PAGE
         });
+        let modpad_slider_info_opt = hidapi_ctx.device_list().find(|device| {
+            device.interface_number() == INTERFACE_NUMBER
+        });
 
-        let modpad_device_path = match modpad_device_info_opt {
+        let modpad_feature_path = match modpad_feature_info_opt {
+            Some(modpad_device_info) => modpad_device_info.path(),
+            None => return Err(ModpadApiError::ModpadNotFound)
+        };
+        let modpad_slider_path = match modpad_slider_info_opt {
             Some(modpad_device_info) => modpad_device_info.path(),
             None => return Err(ModpadApiError::ModpadNotFound)
         };
 
-        let modpad_device = hidapi_ctx.open_path(modpad_device_path)?;
+        let modpad_feature = hidapi_ctx.open_path(modpad_feature_path)?;
+        let modpad_slider = hidapi_ctx.open_path(modpad_slider_path)?;
 
         Ok(Self {
-            modpad_device
+            modpad_slider, modpad_feature
         })
     }
 
@@ -52,10 +65,17 @@ impl ModpadApi {
         buffer[6] = modpad_command_report.optional_2;
         buffer[7] = 0x00;
 
-        self.modpad_device.send_feature_report(&buffer)?;
+        self.modpad_feature.send_feature_report(&buffer)?;
         log::debug!("Sent feature report: {buffer:?}");
 
         Ok(())
+    }
+
+    pub fn read_report(&self) -> Result<Vec<u8>, ModpadApiError> {
+        let mut buf = [0u8; 8];
+        let len = self.modpad_slider.read(&mut buf).expect("error reading");
+        let data: Vec<u8> = buf[..len].to_vec();
+        Ok(data)
     }
 
     pub fn set_effect(&self, effect: Effect) -> Result<(), ModpadApiError> {

@@ -9,3 +9,15 @@ clap-verbosity-flag = "2.2.1"
 env_logger = "0.11.5"
 hidapi = "2.6.3"
 log = "0.4.22"
+
+[dependencies.windows]
+version = "0.58.0"
+features = [
+    "Win32",
+    "Win32_Media",
+    "Win32_Media_Audio",
+    "Win32_System",
+    "Win32_System_Com",
+    "Win32_Media_KernelStreaming",
+    "Win32_Media_Audio_Endpoints"
+]
