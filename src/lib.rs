@@ -17,8 +17,6 @@ impl ModpadApi {
     pub const ROW_COUNT: u8 = 2;
     pub const COLUMN_COUNT: u8 = 4;
     pub const KEY_COUNT: u8 = Self::ROW_COUNT * Self::COLUMN_COUNT;
-    pub const FEATURE_REPORT: &'static str = "feature";
-    pub const SLIDER_REPORT: &'static str = "slider";
 
     pub fn new() -> Result<Self, ModpadApiError> {
         const VID: u16 = 0x03eb;

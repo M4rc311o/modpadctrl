@@ -1,5 +1,6 @@
 use std::fmt;
 use std::process;
+use log::LevelFilter;
 use modpadctrl::ModpadApi;
 use windows::core::Interface;
 use windows::Win32::Media::Audio::{
@@ -17,7 +18,7 @@ struct Session {
 
 impl fmt::Display for Session {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Name: {} \nVolume: {}", self.name, self.get_volume())
+        write!(f, "Name: {} Volume: {}", self.name, self.get_volume())
         }
     }
 struct Sessions {
@@ -161,6 +162,9 @@ fn list_session(name: &str) -> Sessions {
 
 
 fn main() {
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Info)
+        .init();
 
     let modpad_api = ModpadApi::new().unwrap_or_else(|err| {
         log::error!("Creating ModpadApi failed: {err:?}");
@@ -180,9 +184,9 @@ fn main() {
             match all_sessions.find(apps[change]) {
                 Some(session) => {
                     session.set_volume((data[change] as f32)/100.0);
-                    println!("{session}");
+                    log::info!("{session}");
                 },
-                None => println!("Session {} not found",apps[change])
+                None => log::warn!("Session {} not found",apps[change])
             }
         }
     }
