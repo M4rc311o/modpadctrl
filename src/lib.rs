@@ -47,12 +47,13 @@ impl ModpadApi {
         let modpad_slider = hidapi_ctx.open_path(modpad_slider_path)?;
 
         Ok(Self {
-            modpad_slider, modpad_feature
+            modpad_slider,
+            modpad_feature
         })
     }
 
     fn send_command(&self, modpad_command_report: ModpadCommandReport) -> Result<(), ModpadApiError> {
-        let mut buffer = [0; 8];
+        let mut buffer = [0u8; 8];
 
         buffer[0] = modpad_command_report.report_id;
         buffer[2] = (modpad_command_report.command >> 8) as u8;
@@ -71,7 +72,7 @@ impl ModpadApi {
 
     pub fn read_report(&self) -> Result<Vec<u8>, ModpadApiError> {
         let mut buf = [0u8; 8];
-        let len = self.modpad_slider.read(&mut buf).expect("error reading");
+        let len = self.modpad_slider.read(&mut buf)?;
         let data: Vec<u8> = buf[..len].to_vec();
         Ok(data)
     }
