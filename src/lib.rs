@@ -17,6 +17,7 @@ impl ModpadApi {
     pub const ROW_COUNT: u8 = 2;
     pub const COLUMN_COUNT: u8 = 4;
     pub const KEY_COUNT: u8 = Self::ROW_COUNT * Self::COLUMN_COUNT;
+    pub const SLIDER_COUNT: u8 = 3;
 
     pub fn new() -> Result<Self, ModpadApiError> {
         const VID: u16 = 0x03eb;
@@ -70,7 +71,7 @@ impl ModpadApi {
         Ok(())
     }
 
-    pub fn read_report(&self) -> Result<Vec<u8>, ModpadApiError> {
+    pub fn read_sliders(&self) -> Result<Vec<u8>, ModpadApiError> {
         let mut buf = [0u8; 8];
         let len = self.modpad_slider.read(&mut buf)?;
         let data: Vec<u8> = buf[..len].to_vec();

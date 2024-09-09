@@ -1,195 +1,143 @@
-use std::fmt;
-use std::process;
-use log::LevelFilter;
+use std::collections::HashMap;
+
 use modpadctrl::ModpadApi;
 use windows::core::Interface;
-use windows::Win32::Media::Audio::{
-    self, eConsole, eRender, ISimpleAudioVolume,
-};
-use windows::Win32::Media::KernelStreaming::GUID_NULL;
-use windows::Win32::System::Com::{
-    self, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
-};
+use windows::Win32::Media::Audio::{eConsole, eRender, ISimpleAudioVolume};
+use windows::Win32::Media::{Audio, KernelStreaming::GUID_NULL};
+use windows::Win32::System::Com::{self, CoInitializeEx, CoUninitialize, CLSCTX_ALL};
 
-struct Session {
+use std::fs;
+use serde::{Deserialize, Serialize};
+
+struct Application {
     name: String,
-    control: ISimpleAudioVolume,
+    sessions: Vec<Audio::ISimpleAudioVolume>
 }
 
-impl fmt::Display for Session {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Name: {} Volume: {}", self.name, self.get_volume())
+impl Application {
+    fn set_volume(&self, volume: f32) -> Result<(), windows::core::Error> {
+        for session in self.sessions.iter() {
+            unsafe {session.SetMasterVolume(volume, &GUID_NULL)?;}
+        }
+        Ok(())
+    }
+
+    fn set_session_volume(&self, volume: f32, session: usize) -> Result<(), windows::core::Error> {
+        if let Some(session) = self.sessions.get(session) {
+            unsafe {session.SetMasterVolume(volume, &GUID_NULL)?;}
+        } else {
+            if let Some(session) = self.sessions.last() {
+                unsafe {session.SetMasterVolume(volume, &GUID_NULL)?;}
+            }
+        }
+        Ok(())
+    }
+
+    fn get_volume(&self) -> Result<f32, windows::core::Error> {
+        if let Some(session) = self.sessions.first() {
+            let volume = unsafe {session.GetMasterVolume()?};
+            Ok(volume)
+        } else {
+            Ok(0f32)
         }
     }
-struct Sessions {
-    list: Vec<Session>,
 }
 
-impl Session {
-    fn set_volume(&self,volume: f32) {
-        unsafe {
-            self.control
-                .SetMasterVolume(volume, &GUID_NULL).unwrap()
-        }
-    }
-    fn get_volume(&self) -> f32 {
-        unsafe {
-            self.control.GetMasterVolume().unwrap()
-        }
-    }
+struct ApplicationManager {
+    applications: HashMap<String, Application>
 }
 
-
-impl Sessions {
-    fn find(&self, name: &str) -> Option<&Session> {
-        self.list.iter().position(|session| session.name == name).map(|index| &self.list[index])
-    }
-    fn de_init(&self){
+impl Drop for ApplicationManager {
+    fn drop(&mut self) {
         unsafe {
             CoUninitialize();
         }
     }
 }
 
-fn list_all_sessions() -> Sessions {
-    unsafe {
-        //Init of COM library
-        CoInitializeEx(None, COINIT_MULTITHREADED).unwrap();
-        //Creating IMMDevice
-        let device_enumerator: Audio::IMMDeviceEnumerator =
-            Com::CoCreateInstance::<_, Audio::IMMDeviceEnumerator>(
-                &Audio::MMDeviceEnumerator,
-                None,
-                CLSCTX_ALL,
-            )
-            .unwrap();
-        let device = device_enumerator
-            .GetDefaultAudioEndpoint(eRender, eConsole)
-            .unwrap();
-        //Activating different volume control interfaces
-        let sessions_manager2 = device
-            .Activate::<Audio::IAudioSessionManager2>(CLSCTX_ALL, None)
-            .unwrap();
-        //SimpleAudio interface (using AudioSessionManager1/2)
-        let session_enumerator = sessions_manager2.GetSessionEnumerator().unwrap();
-        let count = session_enumerator.GetCount().unwrap();
+impl ApplicationManager {
+    fn new() -> Result<Self, windows::core::Error> {
+        unsafe {CoInitializeEx(None, Com::COINIT_MULTITHREADED).ok()?;}
 
-        let mut list = vec![];
-        for num in 0..count {
-            //Creating a control interface for the session that is currently being controlled
-            let session_control = session_enumerator.GetSession(num).unwrap();
-            //Getting the path of the program that is controlled by the session
-            let session_control2 = session_control
-                .cast::<Audio::IAudioSessionControl2>()
-                .expect("Cast session2 not worky");
-            let identifier = session_control2
-                .GetSessionInstanceIdentifier()
-                .unwrap()
-                .to_string()
-                .unwrap();
-            //Extracting the name of the program from the path
-            let name = identifier
+        let device_enumerator = unsafe {Com::CoCreateInstance::<_, Audio::IMMDeviceEnumerator>(
+            &Audio::MMDeviceEnumerator,
+            None,
+            CLSCTX_ALL
+        )?};
+        let device = unsafe {device_enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?};
+        let session_manager2 = unsafe {device.Activate::<Audio::IAudioSessionManager2>(CLSCTX_ALL, None)?};
+        let session_enumerator = unsafe {session_manager2.GetSessionEnumerator()?};
+        let session_count = unsafe {session_enumerator.GetCount()?};
+
+        let mut applications = HashMap::new();
+        
+        for s in 0..session_count {
+            let session_control2 = unsafe {session_enumerator.GetSession(s)?}.cast::<Audio::IAudioSessionControl2>()?;
+            let session_identifier = unsafe {session_control2.GetSessionInstanceIdentifier()?.to_string()?};
+            let simple_volume = session_control2.cast::<ISimpleAudioVolume>()?;
+            if let Some(name) = session_identifier
                 .rsplit_once("\\")
-                .and_then(|(_, part)| part.split_once("%").map(|(application, _)| application)) 
-                .unwrap_or("Unknown");
-            //println!("{name}");
-            let control = session_control
-                .cast::<Audio::ISimpleAudioVolume>()
-                .expect("Cast not worky");
-            list.push(Session {name: name.to_string(),control,})
+                .and_then(|(_, p)| p.split_once("%").map(|(name, _)| name))
+            {
+                let application = applications.entry(name.to_string().to_lowercase()).or_insert(Application {name: name.to_string(), sessions: Vec::new()});
+                application.sessions.push(simple_volume);
+            }
         }
-        Sessions { list }
+    
+        Ok(Self {applications})
+    }
+
+    fn find(&self, name: &str) -> Option<&Application> {
+        self.applications.get(name)
     }
 }
 
-fn list_session(name: &str) -> Sessions {
-    unsafe {
-        //Init of COM library
-        CoInitializeEx(None, COINIT_MULTITHREADED).unwrap();
-        //Creating IMMDevice
-        let device_enumerator: Audio::IMMDeviceEnumerator =
-            Com::CoCreateInstance::<_, Audio::IMMDeviceEnumerator>(
-                &Audio::MMDeviceEnumerator,
-                None,
-                CLSCTX_ALL,
-            )
-            .unwrap();
-        let device = device_enumerator
-            .GetDefaultAudioEndpoint(eRender, eConsole)
-            .unwrap();
-        //Activating different volume control interfaces
-        let sessions_manager2 = device
-            .Activate::<Audio::IAudioSessionManager2>(CLSCTX_ALL, None)
-            .unwrap();
-        //SimpleAudio interface (using AudioSessionManager1/2)
-        let session_enumerator = sessions_manager2.GetSessionEnumerator().unwrap();
-        let count = session_enumerator.GetCount().unwrap();
-
-        let mut list = vec![];
-        for num in 0..count {
-            //Creating a control interface for the session that is currently being controlled
-            let session_control = session_enumerator.GetSession(num).unwrap();
-            //Getting the path of the program that is controlled by the session
-            let session_control2 = session_control
-                .cast::<Audio::IAudioSessionControl2>()
-                .expect("Cast session2 not worky");
-            let identifier = session_control2
-                .GetSessionInstanceIdentifier()
-                .unwrap()
-                .to_string()
-                .unwrap();
-            //Extracting the name of the program from the path
-            let application = match identifier.rsplit_once("\\").and_then(|(_, part)| part.split_once("%").map(|(application, _)| application)){
-                Some(application) => if application == name {
-                    application
-                } else {
-                    continue
-                },
-                None => {
-                    //println!("Application {name} not found");
-                    continue
-                }
-            };
-            let control = session_control
-                .cast::<Audio::ISimpleAudioVolume>()
-                .expect("Cast not worky");
-            list.push(Session {name: application.to_string(),control,})
-        }
-        Sessions { list }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+struct Slider {
+    application: String,
+    #[serde(default)]
+    session: Option<usize>
 }
 
-
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    sliders: Vec<Slider>
+}
 
 fn main() {
     env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
+        .filter_level(log::LevelFilter::Off)
         .init();
 
-    let modpad_api = ModpadApi::new().unwrap_or_else(|err| {
-        log::error!("Creating ModpadApi failed: {err:?}");
-        process::exit(1)
-    });
-    log::info!("ModpadApi created");
-    let all_sessions = list_all_sessions();
-    let apps = ["steam.exe", "chrome.exe", "Spotify.exe"];
+    let application_manager = ApplicationManager::new().expect("Failed to create application manager");
 
-    //report.set_blocking_mode(true).unwrap();
-    let mut prev_data: Vec<u8> = vec![0u8;3];
+    let config_str = fs::read_to_string("sliders.toml").expect("Failed to read config");
+    let config: Config = toml::from_str(&config_str).expect("Failed to parse config");
+
+    let modpad_api = ModpadApi::new().expect("Failed to create Modpad Api");
+
+    let mut prev_sliders_data: Vec<u8> = vec![0u8;ModpadApi::SLIDER_COUNT.into()];
     loop {
-        let data = modpad_api.read_report().unwrap();
-        if !data.iter().eq(&prev_data){
-            let change = data.iter().zip(&prev_data).position(|(new, prev)| new != prev).expect("Failed to get what index changed");
-            prev_data[change] = data [change].clone();
-            match all_sessions.find(apps[change]) {
-                Some(session) => {
-                    session.set_volume((data[change] as f32)/100.0);
-                    log::info!("{session}");
-                },
-                None => log::warn!("Session {} not found",apps[change])
+        let sliders_data = modpad_api.read_sliders().expect("Failed ot read sliders");
+        for (index, slider) in sliders_data.iter().enumerate() {
+            if *slider != prev_sliders_data[index] {
+                prev_sliders_data[index] = *slider;
+
+                let config_slider = match config.sliders.get(index) {
+                    Some(slider) =>  slider,
+                    None => continue
+                };
+                let app_name = &config_slider.application;
+                let app = match application_manager.find(&app_name) {
+                    Some(app) => app,
+                    None => continue
+                };
+
+                match config_slider.session {
+                    Some(session) => app.set_session_volume((*slider as f32) / 100.0, session).expect("Failed to set volume"),
+                    None => app.set_volume((*slider as f32) / 100.0).expect("Failed to set volume")
+                }
             }
         }
     }
-    all_sessions.de_init();
-
 }

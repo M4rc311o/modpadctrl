@@ -1,0 +1,10 @@
+[[sliders]]
+application = "discord.exe"
+session = 1
+
+[[sliders]]
+application = "firefox.exe"
+
+[[sliders]]
+application = "spotify.exe"
+session = 2
