@@ -63,7 +63,7 @@ impl ModpadApi {
         buffer[3] = (modpad_command_report.value & 0xff) as u8;
         buffer[5] = modpad_command_report.optional_1;
         buffer[6] = modpad_command_report.optional_2;
-        buffer[7] = 0x00;
+        buffer[7] = modpad_command_report.optional_3;
 
         self.modpad_feature.send_feature_report(&buffer)?;
         log::debug!("Sent feature report: {buffer:?}");
@@ -78,7 +78,7 @@ impl ModpadApi {
         Ok(data)
     }
 
-    pub fn set_effect(&self, effect: Effect) -> Result<(), ModpadApiError> {
+    pub fn set_effect(&self, effect: Effect, module: Module) -> Result<(), ModpadApiError> {
         self.send_command(ModpadCommandReport {
             report_id: 0x03,
             command: 0x01,
@@ -86,16 +86,22 @@ impl ModpadApi {
                 Effect::Off => 0x101,
                 Effect::MaxBrightness => 0x102,
                 Effect::Breathing => 0x103,
-                Effect::ButtonActivated => 0x104,
+                Effect::InputActivated => 0x104,
                 Effect::CustomBrightness => 0x105,
                 Effect::Random => 0x106
             },
             optional_1: 0,
-            optional_2: 0
+            optional_2: 0,
+            optional_3: match module {
+                Module::Modpad => 0x00,
+                Module::Module1 => 0x01,
+                Module::Module2 => 0x02,
+                Module::Module3 => 0x03
+            }
         })
     }
 
-    pub fn change_brightness(&self, brightness_dir: Brightness) -> Result<(), ModpadApiError> {
+    pub fn change_brightness(&self, brightness_dir: Brightness, module: Module) -> Result<(), ModpadApiError> {
         self.send_command(ModpadCommandReport {
             report_id: 0x03,
             command: 0x02,
@@ -104,32 +110,50 @@ impl ModpadApi {
                 Brightness::Decrease => 0x20b
             },
             optional_1: 0,
-            optional_2: 0
+            optional_2: 0,
+            optional_3: match module {
+                Module::Modpad => 0x00,
+                Module::Module1 => 0x01,
+                Module::Module2 => 0x02,
+                Module::Module3 => 0x03
+            }
         })
     }
 
-    pub fn switch_profile(&self, profile_number: u8) -> Result<(), ModpadApiError> {
+    pub fn switch_profile(&self, profile_number: u8, module: Module) -> Result<(), ModpadApiError> {
         if (1..=Self::PROFILE_COUNT).contains(&profile_number) {
             self.send_command(ModpadCommandReport {
                 report_id: 0x03,
                 command: 0x03,
                 value: (profile_number - 1) as u16,
                 optional_1: 0,
-                optional_2: 0
+                optional_2: 0,
+                optional_3: match module {
+                    Module::Modpad => 0x00,
+                    Module::Module1 => 0x01,
+                    Module::Module2 => 0x02,
+                    Module::Module3 => 0x03
+                }
             })
         } else {
             Err(ModpadApiError::CommandArgumentInvalid)
         }
     }
 
-    pub fn map(&self, key_code: KeyboardKeypadPage, profile_number: u8, key_number: u8) -> Result<(), ModpadApiError> {
+    pub fn map(&self, key_code: KeyboardKeypadPage, profile_number: u8, key_number: u8, module: Module) -> Result<(), ModpadApiError> {
         if (1..=Self::PROFILE_COUNT).contains(&profile_number) && (1..=Self::KEY_COUNT).contains(&key_number) {
             self.send_command(ModpadCommandReport {
                 report_id: 0x03,
                 command: 0x04,
                 value: key_code as u16,
                 optional_1: profile_number - 1,
-                optional_2: key_number - 1
+                optional_2: key_number - 1,
+                optional_3: match module {
+                    Module::Modpad => 0x00,
+                    Module::Module1 => 0x01,
+                    Module::Module2 => 0x02,
+                    Module::Module3 => 0x03
+                }
             })
         } else {
             Err(ModpadApiError::CommandArgumentInvalid)
@@ -142,7 +166,7 @@ pub enum Effect {
     Off,
     MaxBrightness,
     Breathing,
-    ButtonActivated,
+    InputActivated,
     CustomBrightness,
     Random
 }
@@ -153,10 +177,19 @@ pub enum Brightness {
     Decrease
 }
 
+#[derive(Clone, ValueEnum, Debug)]
+pub enum Module {
+    Modpad,
+    Module1,
+    Module2,
+    Module3
+}
+
 struct ModpadCommandReport {
     report_id: u8,
     command: u16,
     value: u16,
     optional_1: u8,
-    optional_2: u8
+    optional_2: u8,
+    optional_3: u8
 }
