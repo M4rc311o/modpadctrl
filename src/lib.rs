@@ -92,12 +92,7 @@ impl ModpadApi {
             },
             optional_1: 0,
             optional_2: 0,
-            optional_3: match module {
-                Module::Modpad => 0x00,
-                Module::Module1 => 0x01,
-                Module::Module2 => 0x02,
-                Module::Module3 => 0x03
-            }
+            optional_3: module as u8
         })
     }
 
@@ -111,12 +106,7 @@ impl ModpadApi {
             },
             optional_1: 0,
             optional_2: 0,
-            optional_3: match module {
-                Module::Modpad => 0x00,
-                Module::Module1 => 0x01,
-                Module::Module2 => 0x02,
-                Module::Module3 => 0x03
-            }
+            optional_3: module as u8
         })
     }
 
@@ -128,12 +118,7 @@ impl ModpadApi {
                 value: (profile_number - 1) as u16,
                 optional_1: 0,
                 optional_2: 0,
-                optional_3: match module {
-                    Module::Modpad => 0x00,
-                    Module::Module1 => 0x01,
-                    Module::Module2 => 0x02,
-                    Module::Module3 => 0x03
-                }
+                optional_3: module as u8
             })
         } else {
             Err(ModpadApiError::CommandArgumentInvalid)
@@ -148,12 +133,7 @@ impl ModpadApi {
                 value: key_code as u16,
                 optional_1: profile_number - 1,
                 optional_2: key_number - 1,
-                optional_3: match module {
-                    Module::Modpad => 0x00,
-                    Module::Module1 => 0x01,
-                    Module::Module2 => 0x02,
-                    Module::Module3 => 0x03
-                }
+                optional_3: module as u8
             })
         } else {
             Err(ModpadApiError::CommandArgumentInvalid)
@@ -178,11 +158,12 @@ pub enum Brightness {
 }
 
 #[derive(Clone, ValueEnum, Debug)]
+#[repr(u8)]
 pub enum Module {
     Modpad,
-    Module1,
-    Module2,
-    Module3
+    Down,
+    Left,
+    Right
 }
 
 struct ModpadCommandReport {

@@ -30,11 +30,10 @@ fn main() {
     let mut prev_sliders_data: Vec<u8> = vec![0u8;ModpadApi::SLIDER_COUNT.into()];
     loop {
         let sliders_data = modpad_api.read_sliders().expect("Failed ot read sliders");
-        log::info!("{:?}",sliders_data);
         for (index, slider) in sliders_data.iter().enumerate() {
             if *slider != prev_sliders_data[index] {
                 prev_sliders_data[index] = *slider;
-                
+
                 let config_slider = match config.sliders.get(index) {
                     Some(slider) =>  slider,
                     None => continue
@@ -44,7 +43,7 @@ fn main() {
                     Some(app) => app,
                     None => continue
                 };
-                
+
                 match config_slider.session {
                     Some(session) => app.set_session_volume((*slider as f32) / 100.0, session).expect("Failed to set volume"),
                     None => app.set_volume((*slider as f32) / 100.0).expect("Failed to set volume")
