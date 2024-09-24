@@ -160,10 +160,10 @@ pub enum Brightness {
 #[derive(Clone, ValueEnum, Debug)]
 #[repr(u8)]
 pub enum Module {
-    Modpad,
-    Down,
-    Left,
-    Right
+    Modpad = 0x00,
+    Down = 0x01,
+    Left = 0x02,
+    Right = 0x03
 }
 
 struct ModpadCommandReport {
