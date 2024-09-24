@@ -17,7 +17,7 @@ struct Config {
 
 fn main() {
     env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Off)
+        .filter_level(log::LevelFilter::Info)
         .init();
 
     let application_manager = ApplicationManager::new().expect("Failed to create application manager");
